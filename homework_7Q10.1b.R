@@ -9,7 +9,7 @@ crime_data <- read.table(
   header = TRUE
 )
 
-# initial random forest model
+# random forest model
 set.seed(1)
 random_forest_model <- randomForest(
   Crime ~ ., 
@@ -21,14 +21,15 @@ print(random_forest_model)
 importance(random_forest_model)
 varImpPlot(random_forest_model)
 
-# out of bag R-squared for default model
+# out of bag R-squared
 y_out_of_bag_prediction_values <- random_forest_model$predicted
+y_out_of_bag_prediction_values
 SSE <- sum((crime_data$Crime - y_out_of_bag_prediction_values)^2)
 SST <- sum((crime_data$Crime - mean(crime_data$Crime))^2)
 out_of_bag_R2 <- 1 - SSE/SST
 out_of_bag_R2
 
-# tuning mtry by averaging OOB MSE across multiple seeds
+# trying different choices of mtry
 mtry_avg_errors <- rep(0, 15)
 seeds <- c(1, 5, 11, 111, 511)
 for (m in 1:15) {
@@ -48,6 +49,18 @@ plot(1:15, mtry_avg_errors, type = "b", xlab = "mtry values", ylab = "out of bag
 best_mtry <- which.min(mtry_avg_errors)
 best_mtry
 
+# cross validation
+set.seed(1)
+tune_grid <- expand.grid(mtry = 1:15)
+ctrl <- trainControl(method = "cv", number = 10)
+rf_cv <- train(Crime ~ ., 
+               data = crime_data, 
+               method = "rf", 
+               trControl = ctrl,
+               tuneGrid = tune_grid,
+               ntree = 500)
+print(rf_cv)
+
 # best random forest model
 set.seed(1)
 best_rf_model <- randomForest(
@@ -61,22 +74,12 @@ print(best_rf_model)
 importance(best_rf_model)
 varImpPlot(best_rf_model, main = paste("mtry =", best_mtry))
 
-# out of bag R-squared for best model
+# out of bag R-squared
 y_out_of_bag_predicted <- best_rf_model$predicted
 SSE <- sum((crime_data$Crime - y_out_of_bag_predicted)^2)
 SST <- sum((crime_data$Crime - mean(crime_data$Crime))^2)
 out_of_bag_R2_value <- 1 - SSE/SST
 out_of_bag_R2_value
-
-# cross validation
-set.seed(1)
-ctrl <- trainControl(method = "cv", number = 5)
-rf_cv <- train(Crime ~ ., 
-               data = crime_data, 
-               method = "rf", 
-               trControl = ctrl, 
-               ntree = 500)
-print(rf_cv)
 
 # testing new data
 test_data <- data.frame(
